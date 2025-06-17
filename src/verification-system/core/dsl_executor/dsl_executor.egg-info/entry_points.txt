@@ -1,0 +1,2 @@
+[console_scripts]
+dsl-executor = dsl_executor.cli:main

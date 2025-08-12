@@ -3,6 +3,21 @@
 **A distributed backend for creating, verifying, and managing legal digital contracts and sub-documents.**
 Modular, programmable, and designed for event-driven contract enforcement in dynamic environments.
 
+### Project Status 🚧
+
+* **Alpha**: This project is in active development and subject to rapid change. ⚠️
+* **Testing Phase**: Features are experimental; expect bugs, incomplete functionality, and breaking changes. 🧪
+* **Not Production-Ready**: We **do not recommend using this in production** (or relying on it) right now. ⛔
+* **Compatibility**: APIs, schemas, and configuration may change without notice. 🔄
+* **Feedback Welcome**: Early feedback helps us stabilize future releases. 💬
+
+---
+
+## 📚 Contents 
+
+* [Index](https://contracts-grid-internal.pages.dev)
+* [Contracts Overview](https://contracts-grid-internal.pages.dev/contracts/contracts)
+
 ---
 
 ## 🌟 Highlights
@@ -70,37 +85,21 @@ Modular, programmable, and designed for event-driven contract enforcement in dyn
 
 ---
 
-## 🛠 Project Status
+## 📢 Communications
 
-🟢 **Actively Maintained and under active development**
-🔧 Modular, extensible, microservice-ready
-🌐 Works in multi-tenant and federated organizational setups
-🤝 Contributions welcome!
-
----
-
-## 🔗 Links
-
-📚 Docs [docs/](docs/)
-🗂️ Contract Manager Source Code [src/contracts-manager/](src/contracts-manager/)
-📊 Contract Query & GraphQL Server [src/contracts-query/](src/contracts-query/)
+1. 📧 Email: [community@opencyberspace.org](mailto:community@opencyberspace.org)  
+2. 💬 Discord: [OpenCyberspace](https://discord.gg/W24vZFNB)  
+3. 🐦 X (Twitter): [@opencyberspace](https://x.com/opencyberspace)
 
 ---
 
-## 📜 License
+## 🤝 Join Us!
 
-This project is released under the [Apache 2.0 License](./LICENSE).
-Feel free to use, extend, and integrate into your systems.
+AIGrid is **community-driven**. Theory, Protocol, implementations - All contributions are welcome.
 
----
+### Get Involved
 
-## 🗣️ Get Involved
+- 💬 [Join our Discord](https://discord.gg/W24vZFNB)  
+- 📧 Email us: [community@opencyberspace.org](mailto:community@opencyberspace.org)
 
-We’re building the programmable future of legal contract automation.
 
-* 💬 Join the conversation
-* 🐛 Report an issue
-* ⭐ Star this project
-* 🤝 Submit improvements or integrations
-
----

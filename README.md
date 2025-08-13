@@ -20,6 +20,21 @@ Modular, programmable, and designed for event-driven contract enforcement in dyn
 
 ---
 
+## 🔗 Links
+
+* 🌐 [Website](https://contracts-grid-internal.pages.dev/)
+* 📄 [Vision Paper](https://resources.aigr.id/)
+* 📚 [Documentation](https://contracts-internal.pages.dev/)
+* 💻 [GitHub](https://github.com/opencyber-space/ContractGr.id)
+
+---
+
+## 🏗 Architecture Diagrams
+
+* 📜 [Contracts System Architecture](./images/contracts-system.png)
+
+---
+
 ## 🌟 Highlights
 
 ### 📄 Contract Lifecycle Management
@@ -95,7 +110,7 @@ Modular, programmable, and designed for event-driven contract enforcement in dyn
 
 ## 🤝 Join Us!
 
-AIGrid is **community-driven**. Theory, Protocol, implementations - All contributions are welcome.
+This project is **community-driven**. Theory, Protocol, implementations - All contributions are welcome.
 
 ### Get Involved
 

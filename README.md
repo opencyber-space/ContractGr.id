@@ -15,8 +15,8 @@ Modular, programmable, and designed for event-driven contract enforcement in dyn
 
 ## 📚 Contents 
 
-* [Index](https://contracts-grid-internal.pages.dev)
-* [Contracts Overview](https://contracts-grid-internal.pages.dev/contracts/contracts)
+* [Index](https://contracts-internal.pages.dev)
+* [Contracts Overview](https://contracts-internal.pages.dev/contracts/contracts)
 
 ---
 
@@ -31,7 +31,7 @@ Modular, programmable, and designed for event-driven contract enforcement in dyn
 
 ## 🏗 Architecture Diagrams
 
-* 📜 [Contracts System Architecture](./images/contracts-system.png)
+* 📜 [Contracts System Architecture](https://contracts-internal.pages.dev/images/contracts-system.png)
 
 ---
 

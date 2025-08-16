@@ -1,4 +1,4 @@
-# 📜 ContractGrid
+# 📜 ContractGrid: Open Contract System for AI Societies
 
 **Protocol-Native Contract & Negotiation Framework for Multi-Agent Systems (MAS) & Society of Agents(SoA)**
 
@@ -110,6 +110,16 @@ With ContractGrid, MAS gain:
 - 🛡️ Integrated **sanctioning & enforcement**  
 - 🌐 Support for **polycentric governance**  
 - 🚀 Acceleration of **collective intelligence**  
+
+---
+
+The **ContractGrid** is built upon the following key projects, each contributing a unique features:  
+
+| Project        | Intuitive Brief |
+|----------------|-----------------|
+| 🛡️ **PolicyGrid**  | Trust and governance layer; aligns AI & agents with shared norms, ethics, and rules. |
+| 🔌 **ServiceGrid** | Service, tool discovery and composition; connects agents to distributed services & tools. |
+| 🔗 **Pervasive.Link** | Meta-protocol that binds heterogeneous systems; encodes, translates protocols, context, languages, and strategies into interoperable structures. |
 
 ---
 

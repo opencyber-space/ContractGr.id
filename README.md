@@ -113,7 +113,7 @@ With ContractGrid, MAS gain:
 
 ---
 
-The **ContractGrid** is built upon the following key projects, each contributing a unique features:  
+The **ContractGrid** is built upon the following key projects, each contributing to unique features:  
 
 | Project        | Intuitive Brief |
 |----------------|-----------------|

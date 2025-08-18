@@ -1,5 +1,7 @@
 # 📜 ContractGrid: Open Contract System for AI Societies
 
+[![Part of Ecosystem: AGI Grid](https://img.shields.io/badge/⚡️Part%20of%20Ecosystem-AGI%20Grid-0A84FF?style=for-the-badge)](https://www.AGIGr.id)
+
 **Protocol-Native Contract & Negotiation Framework for Multi-Agent Systems (MAS) & Society of Agents(SoA)**
 
 ---

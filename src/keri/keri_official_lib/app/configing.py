@@ -1,0 +1,267 @@
+# -*- encoding: utf-8 -*-
+"""
+keri.app.configing module
+
+"""
+import json
+import os
+
+import cbor2 as cbor
+import hjson
+import msgpack
+from hio.base import filing, doing
+
+from ..help import ogler
+
+logger = ogler.getLogger()
+
+
+def openCF(cls=None, filed=True, **kwa):
+    """Return a context manager that opens a Configer instance.
+
+    Thin wrapper around :func:`filing.openFiler` with ``Configer`` as the
+    default class and ``filed=True`` as the default.
+
+    Args:
+        cls (type, optional): Filer subclass to instantiate. Defaults to
+            ``Configer`` when ``None``.
+        filed (bool): ``True`` means ``.path`` is a file path rather than a
+            directory path. Defaults to ``True``.
+        **kwa: Additional keyword arguments forwarded to
+            :func:`filing.openFiler`.
+
+    Returns:
+        contextlib.AbstractContextManager: Context manager that yields an open
+            ``Configer`` instance.
+    """
+    if cls == None:  # can't reference class before its defined below
+        cls = Configer
+    return filing.openFiler(cls=cls, filed=filed, **kwa)
+
+
+class Configer(filing.Filer):
+    """Habitat config file reader/writer.
+
+    Extends :class:`filing.Filer` to support reading and writing a single
+    config file in one of four serialization formats determined by the file
+    extension:
+
+    - ``.json`` — HJSON (human-friendly superset of JSON) when ``human=True``;
+      strict JSON with two-space indentation when ``human=False``.
+    - ``.mgpk`` — MsgPack binary.
+    - ``.cbor`` — CBOR binary.
+
+    Attributes:
+        human (bool): When ``True`` and the file extension is ``.json``, use
+            HJSON for serialization. When ``False``, use strict JSON.
+
+    Example:
+        Expected JSON/HJSON config file structure:
+
+        .. code-block:: json
+
+            {
+            "dt": "2021-01-01T00:00:00.000000+00:00",
+            "nel":
+            {
+                "dt": "2021-01-01T00:00:00.000000+00:00",
+                "curls":
+                [
+                "tcp://localhost:5621/"
+                ]
+            },
+            "iurls":
+            [
+                "tcp://localhost:5620/?role=peer&name=tam"
+            ],
+            "durls":
+            [
+                "http://127.0.0.1:7723/oobi/EB...",
+                "http://127.0.0.1:7723/oobi/EM..."
+            ],
+            "wurls":
+            [
+                "http://127.0.0.1:5644/.well-known/keri/oobi/EB..."
+            ]
+            }
+    """
+    TailDirPath = os.path.join("keri", "cf")
+    CleanTailDirPath = os.path.join("keri", "clean", "cf")
+    AltTailDirPath = os.path.join(".keri", "cf")
+    AltCleanTailDirPath = os.path.join(".keri", "clean", "cf")
+    TempPrefix = "keri_cf_"
+
+    def __init__(self, name="conf", base="main", filed=True, mode="r+b",
+                 fext="json", human=True, **kwa):
+        """Initialize and open the config file.
+
+        Args:
+            name (str): Leaf name component used to differentiate multiple
+                KERI installations on the same host. Defaults to ``"conf"``.
+            base (str): Optional intermediate directory segment inserted
+                between the head directory and ``name``. An empty string
+                omits this segment. Defaults to ``"main"``.
+            filed (bool): ``True`` means ``.path`` is a file path; ``False``
+                means ``.path`` is a directory path. Defaults to ``True``.
+            mode (str): File open mode. Defaults to ``"r+b"`` (read/write
+                binary without truncation).
+            fext (str): File extension (without leading dot) used when
+                ``filed=True``. Determines the serialization format.
+                Defaults to ``"json"``.
+            human (bool): When ``True`` and ``fext`` is ``"json"``, use HJSON
+                for :meth:`put` and :meth:`get`. Defaults to ``True``.
+            **kwa: Additional keyword arguments forwarded to
+                :class:`filing.Filer`.
+        """
+        super(Configer, self).__init__(name=name,
+                                       base=base,
+                                       filed=filed,
+                                       mode=mode,
+                                       fext=fext,
+                                       **kwa)
+        self.human = True if human else False
+
+
+    def put(self, data: dict, human=None):
+        """Serialize ``data`` and overwrite the config file.
+
+        Truncates the file before writing. The serialization format is
+        determined by the file extension of ``.path``:
+
+        - ``.json`` — HJSON when ``human`` is truthy, strict JSON otherwise.
+        - ``.mgpk`` — MsgPack.
+        - ``.cbor`` — CBOR.
+
+        Args:
+            data (dict): Data to serialize and write.
+            human (bool, optional): Override ``self.human`` for this call.
+                ``None`` means use ``self.human``. Defaults to ``None``.
+
+        Returns:
+            bool: ``True`` on success.
+
+        Raises:
+            ValueError: If the file is not open.
+            IOError: If the file extension is not ``.json``, ``.mgpk``, or
+                ``.cbor``.
+        """
+        if not self.file or self.file.closed:
+            raise ValueError(f"File '{self.path}' not opened.")
+
+        human = human if human is not None else self.human
+        self.file.seek(0)
+        self.file.truncate()
+        root, ext = os.path.splitext(self.path)
+        if ext == '.json':  # json can't dump to binary
+            if human:
+                ser = hjson.dumps(data)
+            else:
+                ser = json.dumps(data, indent=2)
+            ser = ser.encode("utf-8")
+        elif ext == '.mgpk':
+            ser = msgpack.dumps(data)
+        elif ext == '.cbor':
+            ser = cbor.dumps(data)
+        else:
+            raise IOError(f"Invalid file path ext '{ext}' "
+                          f"not '.json', '.mgpk', or 'cbor'.")
+        self.file.write(ser)
+        self.file.flush()
+        os.fsync(self.file.fileno())
+        return True
+
+
+    def get(self, human=None):
+        """Read and deserialize the config file.
+
+        The deserialization format is determined by the file extension of
+        ``.path``:
+
+        - ``.json`` — HJSON when ``human`` is truthy, strict JSON otherwise.
+        - ``.mgpk`` — MsgPack.
+        - ``.cbor`` — CBOR.
+
+        An empty file returns an empty dict without error.
+
+        Args:
+            human (bool, optional): Override ``self.human`` for this call.
+                ``None`` means use ``self.human``. Defaults to ``None``.
+
+        Returns:
+            dict: Deserialized config data, or an empty dict if the file is
+                empty.
+
+        Raises:
+            ValueError: If the file is not open.
+            IOError: If the file extension is not ``.json``, ``.mgpk``, or
+                ``.cbor``.
+        """
+        if not self.file or self.file.closed:
+            raise ValueError(f"File '{self.path}' not opened.")
+
+        human = human if human is not None else self.human
+        it = {}
+        self.file.seek(0)
+        ser = self.file.read()
+        if ser:  # not empty
+            root, ext = os.path.splitext(self.path)
+            if ext == '.json':  # json.load works with bytes as well as str
+                if human:
+                    it = hjson.loads(ser.decode("utf-8"))
+                else:
+                    it = json.loads(ser.decode("utf-8"))
+            elif ext == '.mgpk':
+                it = msgpack.loads(ser)
+            elif ext == '.cbor':
+                it = cbor.loads(ser)
+            else:
+                raise IOError(f"Invalid file path ext '{ext}' "
+                             f"not '.json', '.mgpk', or 'cbor'.")
+        return it
+
+
+class ConfigerDoer(doing.Doer):
+    """Doer that manages the lifecycle of a :class:`Configer` instance.
+
+    Opens the ``Configer`` on :meth:`enter` if it is not already open, and
+    closes it on :meth:`exit`, clearing the underlying file if the
+    ``Configer`` was opened in temporary mode.
+
+    Attributes:
+        done (bool): Completion flag. ``True`` when the doer has finished
+            normally; ``False`` when it exited early due to close or abort.
+        configer (Configer): The managed ``Configer`` instance.
+
+    Properties:
+        tyme (float): Relative cycle time obtained from the injected
+            ``tymth`` closure.
+        tymth (callable): Closure returned by ``Tymist.tymeth()``. Calling
+            it returns the associated ``Tymist.tyme`` value.
+        tock (float): Desired interval in seconds between runs. Zero means
+            run as soon as possible. Must be non-negative.
+    """
+
+    def __init__(self, configer, **kwa):
+        """Initialize the doer with a ``Configer`` instance.
+
+        Args:
+            configer (Configer): The ``Configer`` instance to manage.
+            **kwa: Additional keyword arguments forwarded to
+                :class:`doing.Doer`.
+        """
+        super(ConfigerDoer, self).__init__(**kwa)
+        self.configer = configer
+
+    def enter(self, *, temp=None):
+        """Open the ``Configer`` if it is not already open.
+
+        Args:
+            temp (bool, optional): Unused. Present for interface compatibility
+                with the base ``Doer`` lifecycle. Defaults to ``None``.
+        """
+        if not self.configer.opened:
+            self.configer.reopen()
+
+    def exit(self):
+        """Close the ``Configer``, clearing its file if opened in temp mode."""
+        self.configer.close(clear=self.configer.temp)

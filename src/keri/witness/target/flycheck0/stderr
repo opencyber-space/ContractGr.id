@@ -1,0 +1,2 @@
+error: the `--keep-going` flag is unstable, pass `-Z unstable-options` to enable it
+See https://github.com/rust-lang/cargo/issues/10496 for more information about the `--keep-going` flag.

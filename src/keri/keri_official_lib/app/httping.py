@@ -1,0 +1,325 @@
+# -*- encoding: utf-8 -*-
+"""
+keri.peer.httping module
+
+"""
+import datetime
+import json
+from dataclasses import dataclass
+from urllib import parse
+
+import falcon
+from hio.base import doing
+from hio.core import http
+from hio.help import Hict, ogler
+
+from ..kering import (ShortageError, ExtractionError,
+                      ColdStartError, sniff, Colds)
+from ..core import Sadder, SerderKERI
+from ..end import designature
+from ..help import nowUTC
+
+
+logger = ogler.getLogger()
+
+CESR_CONTENT_TYPE = "application/cesr"
+CESR_ATTACHMENT_HEADER = "CESR-ATTACHMENT"
+CESR_DESTINATION_HEADER = "CESR-DESTINATION"
+
+
+class SignatureValidationComponent(object):
+    """ Validate SKWA signatures """
+
+    def __init__(self, hby, pre):
+        self.hby = hby
+        self.pre = pre
+
+    def process_request(self, req, resp):
+        """ Process request to ensure has a valid signature from controller
+
+        Parameters:
+            req: Http request object
+            resp: Http response object
+
+        """
+        sig = req.headers.get("SIGNATURE")
+        ked = req.media
+        ser = json.dumps(ked).encode("utf-8")
+        if not self.validate(sig=sig, ser=ser):
+            resp.complete = True
+            resp.status = falcon.HTTP_401
+            return
+
+    def validate(self, sig, ser):
+        signages = designature(sig)
+        markers = signages[0].markers
+
+        if self.pre not in self.hby.kevers:
+            return False
+
+        verfers = self.hby.kevers[self.pre].verfers
+        for idx, verfer in enumerate(verfers):
+            key = str(idx)
+            if key not in markers:
+                return False
+            siger = markers[key]
+            siger.verfer = verfer
+
+            if not verfer.verify(siger.raw, ser):
+                return False
+
+        return True
+
+
+@dataclass
+class CesrRequest:
+    payload: dict
+    attachments: str
+
+
+def parseCesrHttpRequest(req):
+    """
+    Parse Falcon HTTP request and create a CESR message from the body of the request and the two
+    CESR HTTP headers (Date, Attachment).
+
+    Parameters
+        req (falcon.Request) http request object in CESR format:
+
+    """
+    if req.content_type != CESR_CONTENT_TYPE:
+        raise falcon.HTTPError(falcon.HTTP_NOT_ACCEPTABLE,
+                               title="Content type error",
+                               description="Unacceptable content type.")
+
+    try:
+        data = json.load(req.bounded_stream)
+    except ValueError:
+        raise falcon.HTTPError(falcon.HTTP_400,
+                               title="Malformed JSON",
+                               description="Could not decode the request body. The "
+                                           "JSON was incorrect.")
+
+    if CESR_ATTACHMENT_HEADER not in req.headers:
+        raise falcon.HTTPError(falcon.HTTP_PRECONDITION_FAILED,
+                               title="Attachment error",
+                               description="Missing required attachment header.")
+    attachment = req.headers[CESR_ATTACHMENT_HEADER]
+
+    cr = CesrRequest(
+        payload=data,
+        attachments=attachment)
+
+    return cr
+
+
+def createCESRRequest(msg, client, dest, path=None):
+    """
+    Turns a KERI message into a CESR http request against the provided hio http Client
+
+    Parameters
+       msg:  KERI message parsable as Serder.raw
+       dest (str): qb64 identifier prefix of destination controller
+       client: hio http Client that will send the message as a CESR request
+       path (str): path to post to
+
+    """
+    path = path if path is not None else "/"
+
+    try:
+        serder = SerderKERI(raw=msg)
+    except ShortageError as ex:  # need more bytes
+        raise ExtractionError("unable to extract a valid message to send as HTTP")
+    else:  # extracted successfully
+        del msg[:serder.size]  # strip off event from front of ims
+
+    attachments = bytearray(msg)
+    body = serder.raw
+
+    headers = Hict([
+        ("Content-Type", CESR_CONTENT_TYPE),
+        ("Content-Length", len(body)),
+        ("connection", "close"),
+        (CESR_ATTACHMENT_HEADER, attachments),
+        (CESR_DESTINATION_HEADER, dest)
+    ])
+
+    client.request(
+        method="POST",
+        path=path,
+        headers=headers,
+        body=body
+    )
+
+
+def streamCESRRequests(client, ims, dest, path=None, headers=None):
+    """
+    Turns a stream of KERI messages into CESR http requests against the provided hio http Client
+
+    Parameters
+       client (Client): hio http Client that will send the message as a CESR request
+       ims (bytearray):  stream of KERI messages parsable as Serder.raw
+       dest (str): qb64 identifier prefix of destination controller
+       path (str): path to post to
+
+    Returns
+       int: Number of individual requests posted
+
+    """
+    path = path if path is not None else "/"
+    path = parse.urljoin(client.requester.path, path)
+
+    cold = sniff(ims)  # check for spurious counters at front of stream
+    if cold in (Colds.txt, Colds.bny):  # not message error out to flush stream
+        # replace with pipelining here once CESR message format supported.
+        raise ColdStartError("Expecting message counter tritet={}"
+                                    "".format(cold))
+
+    # Otherwise its a message cold start
+    cnt = 0
+    while ims:  # extract and deserialize message from ims
+        try:
+            serder = Sadder(raw=ims)
+        except ShortageError as ex:  # need more bytes
+            raise ExtractionError("unable to extract a valid message to send as HTTP")
+        else:  # extracted successfully
+            del ims[:serder.size]  # strip off event from front of ims
+
+        attachment = bytearray()
+        while ims and ims[0] != 0x7b:  # not new message so process attachments, must support CBOR and MsgPack
+            attachment.append(ims[0])
+            del ims[:1]
+
+        body = serder.raw
+
+        headers = headers if headers is not None else Hict()
+        heads = (Hict([
+            ("Content-Type", CESR_CONTENT_TYPE),
+            ("Content-Length", len(body)),
+            (CESR_ATTACHMENT_HEADER, attachment),
+            (CESR_DESTINATION_HEADER, dest)
+        ]))
+        heads.update(headers)
+
+        client.request(
+            method="POST",
+            path=path,
+            headers=heads,
+            body=body
+        )
+        cnt += 1
+
+    return cnt
+
+
+class Clienter(doing.DoDoer):
+    """
+    Clienter is a DoDoer that manages hio HTTP clients using a ClientDoer for each HTTP request.
+    It executes HTTP requests using a HIO HTTP Client run by a ClientDoer. Once a request has
+    received a response then the corresponding Doer is removed from this Clienter.
+
+    Doers:
+        - clientDo: Periodically checks for stale clients and removes them if they have not received a response
+          within the specified timeout period.
+    """
+
+    TimeoutClient = 300  # seconds to wait for response before removing client, default is 5 minutes
+
+    def __init__(self):
+        """Initialize clienter with an empty list of client tuples.
+
+        Attributes:
+            clients (list[tuple]): Active client tuples, each containing a
+                ``ClientDoer`` instance, an hio HTTP ``Client`` instance,
+                and a ``datetime`` timestamp.
+            doers (list): Doers managed by this Clienter, initialized with clientDo.
+        """
+        self.clients = []
+        doers = [doing.doify(self.clientDo)]
+        super(Clienter, self).__init__(doers=doers)
+
+    def request(self, method, url, body=None, headers=None):
+        """
+        Perform an HTTP request using a hio http Client and ClientDoer and returns the Client.
+
+        Parameters:
+            method (str): HTTP method to use (e.g., "GET", "POST")
+            url (str): URL to send the request to
+            body (str or bytes, optional): Body of the request, defaults to None
+            headers (dict, optional): Headers to include in the request, defaults to None
+
+        Returns:
+            http.clienting.Client: The hio HTTP Client used for the request, or None if an error occurs.
+        """
+        purl = parse.urlparse(url)
+
+        try:
+            client = http.clienting.Client(scheme=purl.scheme,
+                                           hostname=purl.hostname,
+                                           port=purl.port,
+                                           portOptional=True)
+        except Exception as e:
+            print(f"error establishing client connection={e}")
+            return None
+
+        if hasattr(body, "encode"):
+            body = body.encode("utf-8")
+
+        client.request(
+            method=method,
+            path=f"{purl.path}?{purl.query}",
+            qargs=None,
+            headers=headers,
+            body=body
+        )
+
+        clientDoer = http.clienting.ClientDoer(client=client)
+        self.extend([clientDoer])
+        self.clients.append((client, clientDoer, nowUTC()))
+
+        return client
+
+    def remove(self, client):
+        """
+        Find a client tuple by hio HTTP Client and remove it and its Doer from the Clienter.
+
+        Parameters:
+            client (http.clienting.Client): The hio HTTP Client to remove from the Clienter.
+        """
+        doers = [(c, d, dt) for (c, d, dt) in self.clients if c == client]
+        if len(doers) == 0:
+            return
+
+        tup = doers[0]
+        self.clients.remove(doers[0])
+        (_, doer, _) = tup
+        super(Clienter, self).remove([doer])
+
+    def clientDo(self, tymth, tock=0.0, **kwa):
+        """ Periodically prune stale clients
+
+        Process existing clients and prune any that have receieved a response longer than timeout
+
+        Parameters:
+            tymth (function): injected function wrapper closure returned by .tymen() of
+                Tymist instance. Calling tymth() returns associated Tymist .tyme.
+            tock (float): injected initial tock value
+
+        """
+        self.wind(tymth)
+        self.tock = tock
+        yield self.tock
+
+        while True:
+            toRemove = []
+            for (client, doer, dt) in self.clients:
+                if client.responses:
+                    now = nowUTC()
+                    if (now - dt) > datetime.timedelta(seconds=self.TimeoutClient):
+                        toRemove.append(client)
+
+                yield self.tock
+
+            for client in toRemove:
+                self.remove(client)
+
+            yield self.tock

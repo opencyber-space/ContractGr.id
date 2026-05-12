@@ -1,0 +1,94 @@
+[package]
+name = "keri-witness"
+version = "1.0.0"
+edition = "2021"
+authors = ["KERI Witness Service"]
+description = "Production-grade KERI Witness in Rust with TimescaleDB"
+license = "Apache-2.0"
+
+[[bin]]
+name = "keri-witness"
+path = "src/main.rs"
+
+[lib]
+name = "keri_witness"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { version = "1.36", features = ["full"] }
+axum = { version = "0.7", features = ["macros"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["trace", "cors", "timeout", "compression-gzip", "request-id"] }
+hyper = { version = "1.1", features = ["full"] }
+
+sqlx = { version = "0.7", features = [
+    "runtime-tokio-native-tls",
+    "postgres",
+    "chrono",
+    "uuid",
+    "json",
+    "migrate",
+] }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+blake3 = "1.5"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+sha2 = "0.10"
+base64 = "0.22"
+hex = "0.4"
+rand = "0.8"
+
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-opentelemetry = { version = "0.22", optional = true }
+
+prometheus = { version = "0.13", features = ["process"] }
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+config = { version = "0.13", features = ["toml", "env"] }
+dotenvy = "0.15"
+clap = { version = "4.4", features = ["derive", "env"] }
+
+thiserror = "1.0"
+anyhow = "1.0"
+
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.7", features = ["v4", "serde"] }
+
+dashmap = "5.5"
+tokio-util = { version = "0.7", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+
+once_cell = "1.19"
+
+[dev-dependencies]
+axum-test = "14.0"
+tokio-test = "0.4"
+mockall = "0.12"
+wiremock = "0.6"
+rstest = "0.18"
+pretty_assertions = "1.4"
+serial_test = "3.0"
+
+[features]
+default = []
+otel = ["tracing-opentelemetry"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
